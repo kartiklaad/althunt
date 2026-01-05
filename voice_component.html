@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Voice Input</title>
+</head>
+<body>
+    <div id="voice-container" style="padding: 15px;">
+        <div id="status" style="font-weight: bold; color: #666; margin-bottom: 10px;">Ready</div>
+        <div id="transcript" style="padding: 10px; background: #f0f0f0; border-radius: 5px; min-height: 60px; margin-bottom: 10px;"></div>
+        <button id="sendBtn" onclick="sendMessage()" style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; display: none;">Send</button>
+    </div>
+    
+    <script>
+    let recognition = null;
+    let finalTranscript = '';
+    
+    function initSpeechRecognition() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+            
+            recognition.onstart = function() {
+                document.getElementById('status').textContent = '🎤 Listening...';
+                document.getElementById('status').style.color = '#4CAF50';
+            };
+            
+            recognition.onresult = function(event) {
+                let interimTranscript = '';
+                finalTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript + ' ';
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                
+                document.getElementById('transcript').textContent = finalTranscript + interimTranscript;
+                
+                if (finalTranscript.trim()) {
+                    document.getElementById('sendBtn').style.display = 'block';
+                }
+            };
+            
+            recognition.onerror = function(event) {
+                document.getElementById('status').textContent = '❌ Error: ' + event.error;
+                document.getElementById('status').style.color = '#f44336';
+            };
+            
+            recognition.onend = function() {
+                document.getElementById('status').textContent = '⏸️ Stopped';
+                document.getElementById('status').style.color = '#666';
+            };
+        }
+    }
+    
+    function startListening() {
+        if (!recognition) {
+            initSpeechRecognition();
+        }
+        if (recognition) {
+            recognition.start();
+        }
+    }
+    
+    function stopListening() {
+        if (recognition) {
+            recognition.stop();
+        }
+    }
+    
+    function sendMessage() {
+        const text = finalTranscript.trim() || document.getElementById('transcript').textContent.trim();
+        if (text) {
+            window.parent.postMessage({
+                type: 'streamlit:setComponentValue',
+                value: text
+            }, '*');
+        }
+    }
+    
+    // Listen for start/stop commands from Streamlit
+    window.addEventListener('message', function(event) {
+        if (event.data.type === 'start') {
+            startListening();
+        } else if (event.data.type === 'stop') {
+            stopListening();
+        }
+    });
+    
+    initSpeechRecognition();
+    </script>
+</body>
+</html>
+
